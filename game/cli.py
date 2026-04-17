@@ -1,4 +1,4 @@
-from gameame import Game
+from game import Game
 
 def play_game():
     game=Game()
