@@ -58,6 +58,9 @@ model player {
   created_at      DateTime         @default(now()) @db.Timestamp(6)
   updated_at      DateTime         @default(now()) @db.Timestamp(6)
   player_password player_password?
+  games           PlayerInGame[]
+  bets            Bet[]
+  hands           PlayerHand[]
 }
 
 model player_password {
@@ -66,4 +69,88 @@ model player_password {
   password   String
   updated_at DateTime @default(now()) @db.Timestamp(6)
   player     player   @relation(fields: [player_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model Game {
+  id           String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String
+  status       GameStatus     @default(WAITING)
+  max_players  Int            @default(6)
+  small_blind  Int            @default(10)
+  big_blind    Int            @default(20)
+  created_at   DateTime       @default(now()) @db.Timestamp(6)
+  updated_at   DateTime       @default(now()) @db.Timestamp(6)
+  players      PlayerInGame[]
+  community_cards String?     // JSON string of cards, e.g. ["Ah","Kd"]
+  current_round Round          @default(PRE_FLOP)
+  dealer_position Int          @default(0)
+  current_player String?       @db.Uuid  // current player's turn
+  pot          Int             @default(0)
+  bets         Bet[]
+  player_hands PlayerHand[]
+}
+
+enum GameStatus {
+  WAITING
+  ACTIVE
+  FINISHED
+}
+
+enum Round {
+  PRE_FLOP
+  FLOP
+  TURN
+  RIVER
+}
+
+model PlayerInGame {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  game_id    String   @db.Uuid
+  player_id  String   @db.Uuid
+  position   Int
+  chips      Int      @default(1000)
+  is_active  Boolean  @default(true)
+  is_folded  Boolean  @default(false)
+  created_at DateTime @default(now()) @db.Timestamp(6)
+  updated_at DateTime @default(now()) @db.Timestamp(6)
+  game       Game     @relation(fields: [game_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  player     player   @relation(fields: [player_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  bets       Bet[]
+  hand       PlayerHand?
+
+  @@unique([game_id, player_id])
+}
+
+model PlayerHand {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  game_id    String   @db.Uuid
+  player_id  String   @db.Uuid
+  cards      String   // JSON string of hole cards, e.g. ["As","Qc"]
+  created_at DateTime @default(now()) @db.Timestamp(6)
+  game       Game     @relation(fields: [game_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  player     player   @relation(fields: [player_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  player_in_game PlayerInGame @relation(fields: [game_id, player_id], references: [game_id, player_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([game_id, player_id])
+}
+
+model Bet {
+  id         String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  game_id    String     @db.Uuid
+  player_id  String     @db.Uuid
+  round      Round
+  action     BetAction
+  amount     Int        @default(0)
+  created_at DateTime   @default(now()) @db.Timestamp(6)
+  game       Game       @relation(fields: [game_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  player     player     @relation(fields: [player_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  player_in_game PlayerInGame @relation(fields: [game_id, player_id], references: [game_id, player_id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+enum BetAction {
+  FOLD
+  CHECK
+  CALL
+  BET
+  RAISE
 }
